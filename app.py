@@ -338,3 +338,5 @@ def setup_database():
 if __name__ == '__main__':
     # Esta é a rota que o Gunicorn ignora e que o Flask usa em desenvolvimento local
     app.run(host='0.0.0.0', port=8080, debug=True)
+
+#
