@@ -1,9 +1,9 @@
 services:
   # 1. O Banco de Dados PostgreSQL
-  - type: postgres
+  - type: psql  # <--- CORRIGIDO (deve ser 'psql')
     name: api-database
-    region: ohio # (Região dos EUA)
-    plan: free # (Plano gratuito)
+    region: ohio
+    plan: free
     databaseName: api_db
     user: api_user
 
@@ -12,39 +12,31 @@ services:
     name: sua-api-flask
     region: ohio
     runtime: python
-    plan: free # (Plano gratuito)
+    plan: free
 
-    # Comando para construir o projeto
     buildCommand: "pip install -r requirements.txt"
-
-    # Comando para rodar (usando Gunicorn)
-    # Ele diz ao Gunicorn para rodar o objeto 'app' de dentro do arquivo 'app.py'
     startCommand: "gunicorn app:app"
 
-    # Variáveis de Ambiente
     envVars:
       - key: APP_SECRET_KEY
-        # Gere uma nova chave aleatória para produção
-        # Você pode trocar este valor no painel do Render depois
         value: "uma-nova-chave-secreta-bem-forte-e-aleatoria"
 
       - key: DATABASE_URL
-        # Pega a URL do banco de dados que criamos acima
         fromService:
-          type: psql
+          type: psql # <--- CORRIGIDO (deve ser 'psql')
           name: api-database
           property: connectionString
 
       - key: PYTHON_VERSION
-        value: "3.10.9" # (Use a versão do seu ambiente)
+        # Verifique no seu terminal local com 'python --version'
+        # e coloque a sua versão ex: 3.10.9, 3.11.4, etc.
+        value: "3.10.9"
 
   # 3. O Disco para seus PDFs
-  # (Seus PDFs serão hospedados separadamente, mas de graça)
   - type: static
     name: documentos-pdf
     region: ohio
-    # Onde os arquivos estáticos estão na sua pasta
     staticPublishPath: ./documentos_pdf
-    # Em qual URL eles devem aparecer
-    # NOTA: O 'startCommand' do Gunicorn não lida com arquivos estáticos
-    # Vamos precisar ajustar o 'importar_resultados.py' para usar a URL deste serviço
+    # O 'staticRootPath' não é necessário para o Gunicorn
+    # Mas precisamos ajustar o 'importar_resultados.py'
+(Nota: Eu também ajustei o static service para ser mais simples e adicionei um comentário sobre PYTHON_VERSION para evitar problemas futuros).
