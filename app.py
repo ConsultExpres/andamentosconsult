@@ -312,3 +312,56 @@ if __name__ == '__main__':
     with app.app_context():
         db.create_all()
     app.run(host='0.0.0.0', port=8080, debug=True)
+
+
+# --- ROTA DE SETUP TEMPORÁRIA ---
+# ESTA É UMA ROTA SECRETA. MUDE A SENHA!
+# DEPOIS DE USAR 1 VEZ, DELETE ESTA ROTA!
+# ----------------------------------------
+@app.route('/admin/setup-database/criaaiconsult2025')
+def setup_database():
+    """
+    Este endpoint secreto roda o script para criar
+    os clientes iniciais no banco da nuvem.
+    """
+    print("Iniciando setup do banco...")
+    try:
+        with app.app_context():
+            # Cria o Cliente 1 (CRIAAI)
+            cliente1_existe = Cliente.query.filter_by(nome_relacional="CRIAAI").first()
+            if not cliente1_existe:
+                print("Criando cliente 'CRIAAI'...")
+                cliente_teste = Cliente(nome_relacional="CRIAAI", token_api="senha")
+                db.session.add(cliente_teste)
+                print("Cliente 'CRIAAI' criado.")
+            else:
+                print("Cliente 'CRIAAI' já existe.")
+
+            # Cria o Cliente 2 (CRY2) - (Opcional, se você quiser)
+            cliente2_existe = Cliente.query.filter_by(nome_relacional="CRY2").first()
+            if not cliente2_existe:
+                print("Criando cliente 'CRY2'...")
+                cliente_cry2 = Cliente(nome_relacional="CRY2", token_api="outra-senha-secreta-456")
+                db.session.add(cliente_cry2)
+                print("Cliente 'CRY2' criado.")
+            else:
+                print("Cliente 'CRY2' já existe.")
+
+            db.session.commit()
+            print("Setup do banco concluído com sucesso!")
+            return jsonify({"status": "sucesso", "mensagem": "Banco de dados populado."}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Erro no setup: {e}")
+        return jsonify({"status": "erro", "mensagem": str(e)}), 500
+
+
+# --- FIM DA ROTA DE SETUP ---
+
+
+# --- 5. RODE O SERVIDOR ---
+if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
+    app.run(host='0.0.0.0', port=8080, debug=True)
