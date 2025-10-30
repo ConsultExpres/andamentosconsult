@@ -29,9 +29,10 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 
-# --- 2. MODELOS (Tabelas do Banco) ---
+# --- 2. MODELOS (Tabelas do Banco - CORRIGIDO O MAPPING PARA POSTGRESQL) ---
 
 class Cliente(db.Model):
+    __tablename__ = 'cliente'  # Corrigido para minúsculas
     id = db.Column(db.Integer, primary_key=True)
     nome_relacional = db.Column(db.String(80), unique=True, nullable=False)
     token_api = db.Column(db.String(120), nullable=False)
@@ -39,6 +40,7 @@ class Cliente(db.Model):
 
 
 class Pesquisa(db.Model):
+    __tablename__ = 'pesquisa'  # Corrigido para minúsculas
     id = db.Column(db.Integer, primary_key=True)
     cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id'), nullable=False)
     instancia = db.Column(db.Integer)
@@ -50,6 +52,7 @@ class Pesquisa(db.Model):
 
 
 class Processo(db.Model):
+    __tablename__ = 'processo'  # Corrigido para minúsculas
     id = db.Column(db.Integer, primary_key=True)
     pesquisa_id = db.Column(db.Integer, db.ForeignKey('pesquisa.id'), nullable=False)
     numero_processo = db.Column(db.String(100), nullable=False)
@@ -64,6 +67,7 @@ class Processo(db.Model):
 
 
 class CapaProcesso(db.Model):
+    __tablename__ = 'capa_processo'  # Corrigido para snake_case
     id = db.Column(db.Integer, primary_key=True)
     processo_id = db.Column(db.Integer, db.ForeignKey('processo.id'), unique=True, nullable=False)
     valor_causa = db.Column(db.Float, nullable=True)
@@ -72,6 +76,7 @@ class CapaProcesso(db.Model):
 
 
 class DocumentoInicial(db.Model):
+    __tablename__ = 'documento_inicial'  # Corrigido para snake_case
     id = db.Column(db.Integer, primary_key=True)
     processo_id = db.Column(db.Integer, db.ForeignKey('processo.id'), nullable=False)
     link_documento = db.Column(db.String(500), nullable=True)  # Salva a URL completa
@@ -80,16 +85,15 @@ class DocumentoInicial(db.Model):
 
 
 class Andamento(db.Model):
+    __tablename__ = 'andamento'  # Corrigido para minúsculas
     id = db.Column(db.Integer, primary_key=True)
     processo_id = db.Column(db.Integer, db.ForeignKey('processo.id'), nullable=False)
     data = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     descricao = db.Column(db.Text)
 
 
-# --- NOVAS TABELAS: Parte e Advogado ---
-
 class Parte(db.Model):
-    """ Tabela para as Partes (Autor, Réu, etc.) """
+    __tablename__ = 'parte'  # Corrigido para minúsculas
     id = db.Column(db.Integer, primary_key=True)
     processo_id = db.Column(db.Integer, db.ForeignKey('processo.id'), nullable=False)
     tipo = db.Column(db.String(100))
@@ -97,7 +101,7 @@ class Parte(db.Model):
 
 
 class Advogado(db.Model):
-    """ Tabela para os Advogados """
+    __tablename__ = 'advogado'  # Corrigido para minúsculas
     id = db.Column(db.Integer, primary_key=True)
     processo_id = db.Column(db.Integer, db.ForeignKey('processo.id'), nullable=False)
     tipo = db.Column(db.String(100))
@@ -131,9 +135,10 @@ def autentica_api():
         ).first()
         if cliente:
             payload = {
-                'iat': int(time.time()), 'nbf': int(time.time())
-                , 'exp': int(time.time()) + 1800, 'id_cliente_interno': cliente.id
-                , 'nomeRelacional': cliente.nome_relacional
+                'iat': int(time.time()), 'nbf': int(time.time()),
+                'exp': int(time.time()) + 1800,
+                'id_cliente_interno': cliente.id,
+                'nomeRelacional': cliente.nome_relacional
             }
             token_jwt = jwt.encode(payload, APP_SECRET_KEY, algorithm="HS256")
             response = make_response(token_jwt, 200)
@@ -223,7 +228,7 @@ def busca_docs_iniciais():
         if pesquisa.cliente_id != payload['id_cliente_interno']:
             return jsonify({"erro": "Acesso negado a esta pesquisa"}), 403
 
-        # --- NOVO: CONEXÃO S3 E GERAÇÃO DE LINK ---
+        # --- CONEXÃO S3 E GERAÇÃO DE LINK ---
         aws_access_key = os.environ.get('AWS_ACCESS_KEY_ID')
         aws_secret_key = os.environ.get('AWS_SECRET_ACCESS_KEY')
         S3_BUCKET_NAME = "andamentosconsult"  # Seu bucket
@@ -297,7 +302,7 @@ def servir_documento(filename):
         {"erro": "Endpoint de download direto desativado. Use o link S3 na buscaDadosDocIniciaisPesquisa."}), 404
 
 
-# --- ROTA DE SETUP TEMPORÁRIA (CRIA TABELAS E CLIENTES) ---
+# --- ROTA TEMPORÁRIA DE SETUP (CRIA TABELAS E CLIENTES) ---
 @app.route('/admin/setup-database/criaaiconsult2025')
 def setup_database():
     """
@@ -332,4 +337,4 @@ def setup_database():
 
 # --- 5. RODE O SERVIDOR ---
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080, debug=True)#
+    app.run(host='0.0.0.0', port=8080, debug=True)
