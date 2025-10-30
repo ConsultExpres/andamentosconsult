@@ -131,10 +131,9 @@ def autentica_api():
         ).first()
         if cliente:
             payload = {
-                'iat': int(time.time()), 'nbf': int(time.time()),
-                'exp': int(time.time()) + 1800,
-                'id_cliente_interno': cliente.id,
-                'nomeRelacional': cliente.nome_relacional
+                'iat': int(time.time()), 'nbf': int(time.time())
+                , 'exp': int(time.time()) + 1800, 'id_cliente_interno': cliente.id
+                , 'nomeRelacional': cliente.nome_relacional
             }
             token_jwt = jwt.encode(payload, APP_SECRET_KEY, algorithm="HS256")
             response = make_response(token_jwt, 200)
@@ -288,46 +287,43 @@ def busca_andamentos():
         return jsonify({"erro": "Erro interno ao processar"}), 500
 
 
-# --- ROTA TEMPORÁRIA DE SETUP (CRIA TABELAS E CLIENTES) ---
+@app.route('/documentos/<path:filename>')
+def servir_documento(filename):
+    """
+    Endpoint de download (agora obsoleto, a consulta acima entrega o link S3).
+    Mantido por compatibilidade.
+    """
+    return jsonify(
+        {"erro": "Endpoint de download direto desativado. Use o link S3 na buscaDadosDocIniciaisPesquisa."}), 404
+
+
+# --- ROTA DE SETUP TEMPORÁRIA (CRIA TABELAS E CLIENTES) ---
 @app.route('/admin/setup-database/criaaiconsult2025')
 def setup_database():
     """
     Endpoint de admin. CRIA AS TABELAS no PostgreSQL e POPULA clientes iniciais.
     """
-    print("Iniciando setup do banco...")
     try:
         with app.app_context():
             # --- PASSO 1: CRIAR AS TABELAS ---
-            print("Criando tabelas (db.create_all())...")
             db.create_all()
-            print("Tabelas criadas (ou já existentes).")
 
             # --- PASSO 2: POPULAR O CLIENTE 1 e 2 ---
             cliente1_existe = Cliente.query.filter_by(nome_relacional="CRIAAI").first()
             if not cliente1_existe:
-                print("Criando cliente 'CRIAAI'...")
                 cliente_teste = Cliente(nome_relacional="CRIAAI", token_api="senha")
                 db.session.add(cliente_teste)
-                print("Cliente 'CRIAAI' criado.")
-            else:
-                print("Cliente 'CRIAAI' já existe.")
 
             cliente2_existe = Cliente.query.filter_by(nome_relacional="CRY2").first()
             if not cliente2_existe:
-                print("Criando cliente 'CRY2'...")
                 cliente_cry2 = Cliente(nome_relacional="CRY2", token_api="outra-senha-secreta-456")
                 db.session.add(cliente_cry2)
-                print("Cliente 'CRY2' criado.")
-            else:
-                print("Cliente 'CRY2' já existe.")
 
             db.session.commit()
-            print("Setup do banco concluído com sucesso!")
             return jsonify({"status": "sucesso", "mensagem": "Tabelas criadas e banco populado."}), 200
 
     except Exception as e:
         db.session.rollback()
-        print(f"Erro no setup: {e}")
         return jsonify({"status": "erro", "mensagem": str(e)}), 500
 
 
@@ -336,7 +332,4 @@ def setup_database():
 
 # --- 5. RODE O SERVIDOR ---
 if __name__ == '__main__':
-    # Esta é a rota que o Gunicorn ignora e que o Flask usa em desenvolvimento local
-    app.run(host='0.0.0.0', port=8080, debug=True)
-
-#
+    app.run(host='0.0.0.0', port=8080, debug=True)#
