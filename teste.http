@@ -1,0 +1,65 @@
+### 1. Autenticar e obter o token
+# @name auth
+POST http://localhost:8080/WebApiDiscoveryFullV2/api/DiscoveryFull/autenticaAPI
+Content-Type: application/json
+
+{
+  "nomeRelacional": "CRIAAI",
+  "token": "senha"
+}
+
+> {%
+    // Script para capturar o token da resposta e salvá-lo
+    client.global.set("api_token", response.body);
+%}
+
+###
+### 2. Cadastrar Pesquisa (usando o token)
+# @name cadastraPesquisa
+POST http://localhost:8080/WebApiDiscoveryFullV2/api/DiscoveryFull/CadastraPesquisa_NumProcessos
+Content-Type: application/json
+Authorization: {{api_token}}
+
+{
+  "instancia": 1,
+  "listaNumProcessos": [
+    "0010342-75.2024.5.03.0178"
+  ],
+  "entregarPublicacoes": false,
+  "entregarDocIniciais": true
+}
+
+###
+### 3. Recupera dados Capa (para Pesquisa 1)
+# @name getCapa
+POST http://localhost:8080/WebApiDiscoveryFullV2/api/DiscoveryFull/buscaDadosResultadoPesquisa
+Content-Type: application/json
+Authorization: {{api_token}}
+
+{
+  "codPesquisa": 1
+}
+
+
+###
+### 4. Recupera Cópia Integral (para Pesquisa 1)
+# @name getDocs
+POST http://localhost:8080/WebApiDiscoveryFullV2/api/DiscoveryFull/buscaDadosDocIniciaisPesquisa
+Content-Type: application/json
+Authorization: {{api_token}}
+
+{
+  "codPesquisa": 1
+}
+
+
+###
+### 5. Recupera Andamentos (para o processo da Pesquisa 1)
+# @name getAndamentos
+POST http://localhost:8080/WebApiDiscoveryFullV2/api/DiscoveryFull/buscaAndamentosProcesso
+Content-Type: application/json
+Authorization: {{api_token}}
+
+{
+  "numeroProcesso": "0010342-75.2024.5.03.0178"
+}

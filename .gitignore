@@ -1,0 +1,26 @@
+# Ambiente Virtual
+.venv
+venv/
+lib/
+include/
+Scripts/
+
+# Arquivos do PyCharm
+.idea/
+
+# Banco de dados local
+*.db
+*.sqlite
+*.sqlite3
+
+# Arquivos temporários do Python
+__pycache__/
+*.pyc
+
+# Arquivos do Excel (relatórios)
+*.xlsx
+*.csv
+
+# Pasta de documentos PDF (Não envie os PDFs para o Git)
+# O Render vai usar um disco separado para eles
+documentos_pdf/

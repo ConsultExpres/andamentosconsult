@@ -1,0 +1,50 @@
+services:
+  # 1. O Banco de Dados PostgreSQL
+  - type: psql
+    name: api-database
+    region: ohio # (Região dos EUA)
+    plan: free # (Plano gratuito)
+    databaseName: api_db
+    user: api_user
+
+  # 2. A API Flask
+  - type: web
+    name: sua-api-flask
+    region: ohio
+    runtime: python
+    plan: free # (Plano gratuito)
+
+    # Comando para construir o projeto
+    buildCommand: "pip install -r requirements.txt"
+
+    # Comando para rodar (usando Gunicorn)
+    # Ele diz ao Gunicorn para rodar o objeto 'app' de dentro do arquivo 'app.py'
+    startCommand: "gunicorn app:app"
+
+    # Variáveis de Ambiente
+    envVars:
+      - key: APP_SECRET_KEY
+        # Gere uma nova chave aleatória para produção
+        # Você pode trocar este valor no painel do Render depois
+        value: "uma-nova-chave-secreta-bem-forte-e-aleatoria"
+
+      - key: DATABASE_URL
+        # Pega a URL do banco de dados que criamos acima
+        fromService:
+          type: psql
+          name: api-database
+          property: connectionString
+
+      - key: PYTHON_VERSION
+        value: "3.10.9" # (Use a versão do seu ambiente)
+
+  # 3. O Disco para seus PDFs
+  # (Seus PDFs serão hospedados separadamente, mas de graça)
+  - type: static
+    name: documentos-pdf
+    region: ohio
+    # Onde os arquivos estáticos estão na sua pasta
+    staticPublishPath: ./documentos_pdf
+    # Em qual URL eles devem aparecer
+    # NOTA: O 'startCommand' do Gunicorn não lida com arquivos estáticos
+    # Vamos precisar ajustar o 'importar_resultados.py' para usar a URL deste serviço
