@@ -1,6 +1,6 @@
 services:
   # 1. O Banco de Dados PostgreSQL
-  - type: psql
+  - type: postgres
     name: api-database
     region: ohio # (Região dos EUA)
     plan: free # (Plano gratuito)
