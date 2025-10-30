@@ -4,6 +4,7 @@ import datetime
 import os
 from flask import Flask, request, jsonify, make_response, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
+import boto3  # Adicionado para S3
 
 # --- 1. CONFIGURAÇÃO INICIAL (ATUALIZADA PARA DEPLOY) ---
 app = Flask(__name__)
@@ -11,20 +12,16 @@ app = Flask(__name__)
 # Lê a Chave Secreta do ambiente. Se não achar, usa a de dev.
 APP_SECRET_KEY = os.environ.get('APP_SECRET_KEY', 'minha-chave-secreta-local-123')
 
-# Lê a URL do Banco de Dados do ambiente (ex: "postgresql://...")
-# Esta variável será fornecida pelo Render
+# Lê a URL do Banco de Dados do ambiente (Ex: "postgresql://...")
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
 if DATABASE_URL:
     # Estamos em produção (na nuvem)
-    # O Render usa 'postgres://' mas o SQLAlchemy prefere 'postgresql://'
     if DATABASE_URL.startswith("postgres://"):
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-
     app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 else:
     # Estamos em desenvolvimento (local)
-    print("AVISO: DATABASE_URL não encontrada. Usando 'sqlite:///api.db' local.")
     basedir = os.path.abspath(os.path.dirname(__file__))
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'api.db')
 
@@ -172,7 +169,6 @@ def cadastra_pesquisa():
         return jsonify({"erro": "Erro interno ao processar"}), 500
 
 
-# --- ENDPOINT DE CAPA ATUALIZADO ---
 @app.route('/WebApiDiscoveryFullV2/api/DiscoveryFull/buscaDadosResultadoPesquisa', methods=['POST'])
 def busca_dados_capa():
     payload, erro = validar_token()
@@ -203,15 +199,9 @@ def busca_dados_capa():
                 "area": capa.area if capa else "",
             }
             processo_json = {
-                "codProcesso": proc.id,
-                "numeroProcessoFormatado": proc.numero_processo,
-                "numeroNaoCnj": None,
-                "instancia": pesquisa.instancia,
-                "valorCausa": capa.valor_causa if capa else None,
-                "assuntos": None,
-                "capaProcesso": capa_json,
-                "partes": partes_json,
-                "advogados": advogados_json,
+                "codProcesso": proc.id, "numeroProcessoFormatado": proc.numero_processo, "numeroNaoCnj": None,
+                "instancia": pesquisa.instancia, "valorCausa": capa.valor_causa if capa else None, "assuntos": None,
+                "capaProcesso": capa_json, "partes": partes_json, "advogados": advogados_json,
                 "dadosProcessoEncontrado": proc.dados_processo_encontrado
             }
             resposta_final.append(processo_json)
@@ -223,6 +213,7 @@ def busca_dados_capa():
 
 @app.route('/WebApiDiscoveryFullV2/api/DiscoveryFull/buscaDadosDocIniciaisPesquisa', methods=['POST'])
 def busca_docs_iniciais():
+    """ Endpoint 4: Recupera Cópia Integral (AGORA COM LINK PRÉ-ASSINADO SEGURO) """
     payload, erro = validar_token()
     if erro: return erro
     try:
@@ -232,19 +223,49 @@ def busca_docs_iniciais():
         if not pesquisa: return jsonify({"erro": "codPesquisa nao encontrado"}), 404
         if pesquisa.cliente_id != payload['id_cliente_interno']:
             return jsonify({"erro": "Acesso negado a esta pesquisa"}), 403
+
+        # --- NOVO: CONEXÃO S3 E GERAÇÃO DE LINK ---
+        aws_access_key = os.environ.get('AWS_ACCESS_KEY_ID')
+        aws_secret_key = os.environ.get('AWS_SECRET_ACCESS_KEY')
+        S3_BUCKET_NAME = "andamentosconsult"  # Seu bucket
+        S3_REGION = "us-east-2"  # Região do seu bucket (Ohio)
+
+        if aws_access_key and aws_secret_key:
+            s3_client = boto3.client(
+                's3',
+                aws_access_key_id=aws_access_key,
+                aws_secret_access_key=aws_secret_key,
+                region_name=S3_REGION
+            )
+        else:
+            s3_client = None
+
         resposta_final = []
         for proc in pesquisa.processos:
             for doc in proc.documentos:
+                signed_url = doc.link_documento
+
+                if s3_client and doc.link_documento and 'amazonaws.com/' in doc.link_documento:
+                    try:
+                        file_key = doc.link_documento.split('amazonaws.com/')[1].split('?')[0]
+                        signed_url = s3_client.generate_presigned_url(
+                            'get_object',
+                            Params={'Bucket': S3_BUCKET_NAME, 'Key': file_key},
+                            ExpiresIn=300  # Válido por 5 minutos
+                        )
+                    except Exception as s3_error:
+                        print(f"Erro ao gerar link S3: {s3_error}")
+                        signed_url = doc.link_documento
+
                 resposta_final.append({
-                    "codDocIniciais": doc.id,
-                    "codPesquisa": pesquisa.id,
-                    "codProcesso": proc.id,
-                    "linkDocumentosIniciais": doc.link_documento,
+                    "codDocIniciais": doc.id, "codPesquisa": pesquisa.id, "codProcesso": proc.id,
+                    "linkDocumentosIniciais": signed_url,
                     "docPeticaoInicial": doc.doc_peticao_inicial,
                     "documentoEncontrado": doc.documento_encontrado
                 })
         return jsonify(resposta_final), 200
     except Exception as e:
+        print(f"Erro em /buscaDadosDocIniciaisPesquisa: {e}")
         return jsonify({"erro": "Erro interno ao processar"}), 500
 
 
@@ -267,66 +288,21 @@ def busca_andamentos():
         return jsonify({"erro": "Erro interno ao processar"}), 500
 
 
-# --- ENDPOINT DE DOCUMENTOS (CORRIGIDO E SEGURO) ---
-@app.route('/documentos/<path:filename>')
-def servir_documento(filename):
-    """
-    Endpoint 6: Serve os arquivos PDF estáticos (AGORA COM SEGURANÇA)
-    """
-    payload, erro = validar_token()
-    if erro: return erro
-
-    try:
-        id_cliente_logado = payload['id_cliente_interno']
-
-        # 1. Encontra todos os documentos no banco que terminam com esse nome de arquivo
-        #    (usamos 'like' porque o banco salva a URL completa)
-        documentos_encontrados = DocumentoInicial.query.filter(
-            DocumentoInicial.link_documento.like(f'%/{filename}')
-        ).all()
-
-        if not documentos_encontrados:
-            return jsonify({"erro": "Documento nao encontrado"}), 404
-
-        # 2. Verifica se o cliente logado tem permissão para *pelo menos um* desses documentos
-        acesso_permitido = False
-        for doc in documentos_encontrados:
-            if doc.processo.pesquisa.cliente_id == id_cliente_logado:
-                acesso_permitido = True
-                break  # Encontrou! Pode parar de procurar.
-
-        # 3. Se tiver permissão, serve o arquivo. Senão, nega.
-        if acesso_permitido:
-            # 'documentos_pdf' é o nome da pasta no seu projeto
-            return send_from_directory('documentos_pdf', filename, as_attachment=True)
-        else:
-            return jsonify({"erro": "Acesso negado a este documento"}), 403
-
-    except Exception as e:
-        print(f"Erro ao servir documento: {e}")
-        return jsonify({"erro": "Erro interno no servidor"}), 500
-
-
-# --- ROTA DE SETUP TEMPORÁRIA ---
-# ESTA É UMA ROTA SECRETA. MUDE A SENHA!
-# DEPOIS DE USAR 1 VEZ, DELETE ESTA ROTA!
-# ----------------------------------------
-@app.route('/admin/setup-database/criaaiconsult2025')  # <-- SUA SENHA SECRETA
+# --- ROTA TEMPORÁRIA DE SETUP (CRIA TABELAS E CLIENTES) ---
+@app.route('/admin/setup-database/criaaiconsult2025')
 def setup_database():
     """
-    Este endpoint secreto CRIA AS TABELAS e depois
-    popula os clientes iniciais no banco da nuvem.
+    Endpoint de admin. CRIA AS TABELAS no PostgreSQL e POPULA clientes iniciais.
     """
     print("Iniciando setup do banco...")
     try:
         with app.app_context():
             # --- PASSO 1: CRIAR AS TABELAS ---
-            # Isto é o que estava faltando!
             print("Criando tabelas (db.create_all())...")
             db.create_all()
             print("Tabelas criadas (ou já existentes).")
 
-            # --- PASSO 2: POPULAR O CLIENTE 1 ---
+            # --- PASSO 2: POPULAR O CLIENTE 1 e 2 ---
             cliente1_existe = Cliente.query.filter_by(nome_relacional="CRIAAI").first()
             if not cliente1_existe:
                 print("Criando cliente 'CRIAAI'...")
@@ -336,7 +312,6 @@ def setup_database():
             else:
                 print("Cliente 'CRIAAI' já existe.")
 
-            # Cria o Cliente 2 (CRY2) - (Opcional)
             cliente2_existe = Cliente.query.filter_by(nome_relacional="CRY2").first()
             if not cliente2_existe:
                 print("Criando cliente 'CRY2'...")
@@ -361,5 +336,5 @@ def setup_database():
 
 # --- 5. RODE O SERVIDOR ---
 if __name__ == '__main__':
-    # O 'db.create_all()' foi removido daqui porque agora está na rota de setup
+    # Esta é a rota que o Gunicorn ignora e que o Flask usa em desenvolvimento local
     app.run(host='0.0.0.0', port=8080, debug=True)
