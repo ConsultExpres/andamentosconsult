@@ -307,27 +307,26 @@ def servir_documento(filename):
         return jsonify({"erro": "Erro interno no servidor"}), 500
 
 
-# --- 5. RODE O SERVIDOR ---
-if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
-    app.run(host='0.0.0.0', port=8080, debug=True)
-
-
 # --- ROTA DE SETUP TEMPORÁRIA ---
 # ESTA É UMA ROTA SECRETA. MUDE A SENHA!
 # DEPOIS DE USAR 1 VEZ, DELETE ESTA ROTA!
 # ----------------------------------------
-@app.route('/admin/setup-database/criaaiconsult2025')
+@app.route('/admin/setup-database/criaaiconsult2025')  # <-- SUA SENHA SECRETA
 def setup_database():
     """
-    Este endpoint secreto roda o script para criar
-    os clientes iniciais no banco da nuvem.
+    Este endpoint secreto CRIA AS TABELAS e depois
+    popula os clientes iniciais no banco da nuvem.
     """
     print("Iniciando setup do banco...")
     try:
         with app.app_context():
-            # Cria o Cliente 1 (CRIAAI)
+            # --- PASSO 1: CRIAR AS TABELAS ---
+            # Isto é o que estava faltando!
+            print("Criando tabelas (db.create_all())...")
+            db.create_all()
+            print("Tabelas criadas (ou já existentes).")
+
+            # --- PASSO 2: POPULAR O CLIENTE 1 ---
             cliente1_existe = Cliente.query.filter_by(nome_relacional="CRIAAI").first()
             if not cliente1_existe:
                 print("Criando cliente 'CRIAAI'...")
@@ -337,7 +336,7 @@ def setup_database():
             else:
                 print("Cliente 'CRIAAI' já existe.")
 
-            # Cria o Cliente 2 (CRY2) - (Opcional, se você quiser)
+            # Cria o Cliente 2 (CRY2) - (Opcional)
             cliente2_existe = Cliente.query.filter_by(nome_relacional="CRY2").first()
             if not cliente2_existe:
                 print("Criando cliente 'CRY2'...")
@@ -349,7 +348,7 @@ def setup_database():
 
             db.session.commit()
             print("Setup do banco concluído com sucesso!")
-            return jsonify({"status": "sucesso", "mensagem": "Banco de dados populado."}), 200
+            return jsonify({"status": "sucesso", "mensagem": "Tabelas criadas e banco populado."}), 200
 
     except Exception as e:
         db.session.rollback()
@@ -362,6 +361,5 @@ def setup_database():
 
 # --- 5. RODE O SERVIDOR ---
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
+    # O 'db.create_all()' foi removido daqui porque agora está na rota de setup
     app.run(host='0.0.0.0', port=8080, debug=True)
