@@ -1,13 +1,13 @@
 services:
   # 1. O Banco de Dados PostgreSQL
-  - type: psql  # <--- CORRIGIDO (deve ser 'psql')
+  - type: postgres
     name: api-database
     region: ohio
     plan: free
     databaseName: api_db
     user: api_user
 
-  # 2. A API Flask
+  # 2. A API Flask (Serviço Web)
   - type: web
     name: sua-api-flask
     region: ohio
@@ -19,24 +19,22 @@ services:
 
     envVars:
       - key: APP_SECRET_KEY
-        value: "uma-nova-chave-secreta-bem-forte-e-aleatoria"
+        generateValue: true # O Render vai criar uma chave segura sozinho
 
       - key: DATABASE_URL
         fromService:
-          type: psql # <--- CORRIGIDO (deve ser 'psql')
+          type: postgres
           name: api-database
           property: connectionString
 
       - key: PYTHON_VERSION
-        # Verifique no seu terminal local com 'python --version'
-        # e coloque a sua versão ex: 3.10.9, 3.11.4, etc.
         value: "3.10.9"
 
   # 3. O Disco para seus PDFs
-  - type: static
+  - type: static_site
     name: documentos-pdf
     region: ohio
+    plan: free
+    # Diretório onde os arquivos estão no seu GitHub
+    # IMPORTANTE: crie esta pasta 'documentos_pdf'
     staticPublishPath: ./documentos_pdf
-    # O 'staticRootPath' não é necessário para o Gunicorn
-    # Mas precisamos ajustar o 'importar_resultados.py'
-(Nota: Eu também ajustei o static service para ser mais simples e adicionei um comentário sobre PYTHON_VERSION para evitar problemas futuros).
