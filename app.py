@@ -48,6 +48,10 @@ class Pesquisa(db.Model):
     entregar_doc_iniciais = db.Column(db.Boolean, default=True)
     data_criacao = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     status = db.Column(db.String(50), default='PENDENTE')
+
+    # TÓPICO 2: Adiciona coluna para limpeza de custos
+    data_entrega = db.Column(db.DateTime, nullable=True)
+
     processos = db.relationship('Processo', backref='pesquisa', lazy=True)
 
 
@@ -65,7 +69,6 @@ class Processo(db.Model):
 
 
 class CapaProcesso(db.Model):
-    # CORRIGIDO: Mapeia para o nome exato do erro ('capaprocessp')
     __tablename__ = 'capaprocessp'
     id = db.Column(db.Integer, primary_key=True)
     processo_id = db.Column(db.Integer, db.ForeignKey('processo.id'), unique=True, nullable=False)
@@ -75,7 +78,6 @@ class CapaProcesso(db.Model):
 
 
 class DocumentoInicial(db.Model):
-    # CORRIGIDO: Mapeia para o nome exato do erro ('documentoinicial')
     __tablename__ = 'documentoinicial'
     id = db.Column(db.Integer, primary_key=True)
     processo_id = db.Column(db.Integer, db.ForeignKey('processo.id'), nullable=False)
@@ -185,6 +187,20 @@ def busca_dados_capa():
         if pesquisa.cliente_id != payload['id_cliente_interno']:
             return jsonify({"erro": "Acesso negado a esta pesquisa"}), 403
 
+        # TÓPICO 1: Lógica de Status
+        if pesquisa.status in ('PENDENTE', 'PROCESSANDO'):
+            return jsonify({"status": "processando",
+                            "mensagem": "Os resultados desta pesquisa ainda estão sendo processados."}), 202
+
+        # Se o status for CONCLUIDO, muda para ENTREGUE e salva a data
+        if pesquisa.status == 'CONCLUIDO':
+            pesquisa.status = 'ENTREGUE'
+            pesquisa.data_entrega = datetime.datetime.utcnow()
+            db.session.add(pesquisa)
+            db.session.commit()
+
+        # (Se o status for 'ENTREGUE', apenas continua e retorna os dados)
+
         resposta_final = []
         for proc in pesquisa.processos:
             capa = proc.capa
@@ -211,6 +227,7 @@ def busca_dados_capa():
             resposta_final.append(processo_json)
         return jsonify(resposta_final), 200
     except Exception as e:
+        db.session.rollback()
         print(f"Erro em /buscaDadosResultadoPesquisa: {e}")
         return jsonify({"erro": "Erro interno ao processar"}), 500
 
@@ -227,6 +244,20 @@ def busca_docs_iniciais():
         if not pesquisa: return jsonify({"erro": "codPesquisa nao encontrado"}), 404
         if pesquisa.cliente_id != payload['id_cliente_interno']:
             return jsonify({"erro": "Acesso negado a esta pesquisa"}), 403
+
+        # TÓPICO 1: Lógica de Status
+        if pesquisa.status in ('PENDENTE', 'PROCESSANDO'):
+            return jsonify({"status": "processando",
+                            "mensagem": "Os resultados desta pesquisa ainda estão sendo processados."}), 202
+
+        # Se o status for CONCLUIDO, muda para ENTREGUE e salva a data
+        if pesquisa.status == 'CONCLUIDO':
+            pesquisa.status = 'ENTREGUE'
+            pesquisa.data_entrega = datetime.datetime.utcnow()
+            db.session.add(pesquisa)
+            db.session.commit()
+
+        # (Se o status for 'ENTREGUE', apenas continua e retorna os dados)
 
         # --- CONEXÃO S3 E GERAÇÃO DE LINK ---
         aws_access_key = os.environ.get('AWS_ACCESS_KEY_ID')
@@ -269,6 +300,7 @@ def busca_docs_iniciais():
                 })
         return jsonify(resposta_final), 200
     except Exception as e:
+        db.session.rollback()
         print(f"Erro em /buscaDadosDocIniciaisPesquisa: {e}")
         return jsonify({"erro": "Erro interno ao processar"}), 500
 
@@ -284,22 +316,28 @@ def busca_andamentos():
         if not processo: return jsonify({"erro": "Processo nao encontrado"}), 404
         if processo.pesquisa.cliente_id != payload['id_cliente_interno']:
             return jsonify({"erro": "Acesso negado a este processo"}), 403
+
+        # TÓPICO 1: Lógica de Status (aplicada à pesquisa-mãe)
+        pesquisa = processo.pesquisa
+        if pesquisa.status in ('PENDENTE', 'PROCESSANDO'):
+            return jsonify({"status": "processando",
+                            "mensagem": "Os resultados desta pesquisa ainda estão sendo processados."}), 202
+
+        if pesquisa.status == 'CONCLUIDO':
+            pesquisa.status = 'ENTREGUE'
+            pesquisa.data_entrega = datetime.datetime.utcnow()
+            db.session.add(pesquisa)
+            db.session.commit()
+
+        # (Se o status for 'ENTREGUE', apenas continua e retorna os dados)
+
         resposta_final = []
         for andamento in processo.andamentos:
             resposta_final.append({"data": andamento.data.isoformat(), "andamento": andamento.descricao})
         return jsonify(resposta_final), 200
     except Exception as e:
+        db.session.rollback()
         return jsonify({"erro": "Erro interno ao processar"}), 500
-
-
-@app.route('/documentos/<path:filename>')
-def servir_documento(filename):
-    """
-    Endpoint de download (agora obsoleto, a consulta acima entrega o link S3).
-    Mantido por compatibilidade.
-    """
-    return jsonify(
-        {"erro": "Endpoint de download direto desativado. Use o link S3 na buscaDadosDocIniciaisPesquisa."}), 404
 
 
 # --- ROTA TEMPORÁRIA DE SETUP (CRIA TABELAS E CLIENTES) ---
@@ -310,7 +348,7 @@ def setup_database():
     """
     try:
         with app.app_context():
-            # --- PASSO 1: CRIAR AS TABELAS ---
+            # --- PASSO 1: CRIAR AS TABELAS (e colunas novas) ---
             db.create_all()
 
             # --- PASSO 2: POPULAR O CLIENTE 1 e 2 ---
@@ -325,7 +363,7 @@ def setup_database():
                 db.session.add(cliente_cry2)
 
             db.session.commit()
-            return jsonify({"status": "sucesso", "mensagem": "Tabelas criadas e banco populado."}), 200
+            return jsonify({"status": "sucesso", "mensagem": "Tabelas criadas/atualizadas e banco populado."}), 200
 
     except Exception as e:
         db.session.rollback()
