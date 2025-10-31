@@ -32,7 +32,7 @@ db = SQLAlchemy(app)
 # --- 2. MODELOS (Tabelas do Banco - CORRIGIDO O MAPPING PARA POSTGRESQL) ---
 
 class Cliente(db.Model):
-    __tablename__ = 'cliente'  # Corrigido para minúsculas
+    __tablename__ = 'cliente'
     id = db.Column(db.Integer, primary_key=True)
     nome_relacional = db.Column(db.String(80), unique=True, nullable=False)
     token_api = db.Column(db.String(120), nullable=False)
@@ -40,7 +40,7 @@ class Cliente(db.Model):
 
 
 class Pesquisa(db.Model):
-    __tablename__ = 'pesquisa'  # Corrigido para minúsculas
+    __tablename__ = 'pesquisa'
     id = db.Column(db.Integer, primary_key=True)
     cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id'), nullable=False)
     instancia = db.Column(db.Integer)
@@ -52,7 +52,7 @@ class Pesquisa(db.Model):
 
 
 class Processo(db.Model):
-    __tablename__ = 'processo'  # Corrigido para minúsculas
+    __tablename__ = 'processo'
     id = db.Column(db.Integer, primary_key=True)
     pesquisa_id = db.Column(db.Integer, db.ForeignKey('pesquisa.id'), nullable=False)
     numero_processo = db.Column(db.String(100), nullable=False)
@@ -67,7 +67,7 @@ class Processo(db.Model):
 
 
 class CapaProcesso(db.Model):
-    __tablename__ = 'capa_processo'  # Corrigido para snake_case
+    __tablename__ = 'capa_processo'  # Corrigido: Agora usa snake_case minúsculo
     id = db.Column(db.Integer, primary_key=True)
     processo_id = db.Column(db.Integer, db.ForeignKey('processo.id'), unique=True, nullable=False)
     valor_causa = db.Column(db.Float, nullable=True)
@@ -76,7 +76,7 @@ class CapaProcesso(db.Model):
 
 
 class DocumentoInicial(db.Model):
-    __tablename__ = 'documento_inicial'  # Corrigido para snake_case
+    __tablename__ = 'documento_inicial'  # Corrigido: Agora usa snake_case minúsculo
     id = db.Column(db.Integer, primary_key=True)
     processo_id = db.Column(db.Integer, db.ForeignKey('processo.id'), nullable=False)
     link_documento = db.Column(db.String(500), nullable=True)  # Salva a URL completa
@@ -85,7 +85,7 @@ class DocumentoInicial(db.Model):
 
 
 class Andamento(db.Model):
-    __tablename__ = 'andamento'  # Corrigido para minúsculas
+    __tablename__ = 'andamento'
     id = db.Column(db.Integer, primary_key=True)
     processo_id = db.Column(db.Integer, db.ForeignKey('processo.id'), nullable=False)
     data = db.Column(db.DateTime, default=datetime.datetime.utcnow)
@@ -93,7 +93,7 @@ class Andamento(db.Model):
 
 
 class Parte(db.Model):
-    __tablename__ = 'parte'  # Corrigido para minúsculas
+    __tablename__ = 'parte'
     id = db.Column(db.Integer, primary_key=True)
     processo_id = db.Column(db.Integer, db.ForeignKey('processo.id'), nullable=False)
     tipo = db.Column(db.String(100))
@@ -101,7 +101,7 @@ class Parte(db.Model):
 
 
 class Advogado(db.Model):
-    __tablename__ = 'advogado'  # Corrigido para minúsculas
+    __tablename__ = 'advogado'
     id = db.Column(db.Integer, primary_key=True)
     processo_id = db.Column(db.Integer, db.ForeignKey('processo.id'), nullable=False)
     tipo = db.Column(db.String(100))
