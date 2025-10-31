@@ -3,23 +3,24 @@ import sys
 import datetime
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
+from sqlalchemy.exc import OperationalError
 
 # --- IMPORTAÇÃO DE CLASSES E CONFIGURAÇÕES ---
-# Importa a URL de conexão do arquivo de configuração local
 try:
     from config_local import DATABASE_URL_REMOTE
 except ImportError:
     print("ERRO CRÍTICO: O arquivo 'config_local.py' não foi encontrado. Crie e cole sua DATABASE_URL_REMOTE.")
     sys.exit(1)
 
-# Importa as classes de modelo (Pesquisa, Processo, etc.) do app.py
 try:
-    from app import Cliente, Pesquisa, Processo, db as original_db
+    from app import Cliente, Pesquisa, Processo, db as original_db, CapaProcesso, DocumentoInicial, Andamento, Parte, \
+        Advogado
     from flask import Flask
 
     app = Flask(__name__)
 except ImportError:
     print("ERRO CRÍTICO: Falha ao importar classes do app.py. O app.py está na pasta raiz?")
+    print("Por favor, certifique-se de que o app.py foi salvo com o Código 1 que eu forneci.")
     sys.exit(1)
 
 
@@ -29,17 +30,34 @@ def get_remote_session():
     """ Cria uma sessão de banco de dados conectada ao PostgreSQL do Render. """
     print(f"Conectando ao banco de dados remoto...")
 
-    # A sua URL COMPLETA. Não é mais necessário o ajuste 'postgres://' -> 'postgresql://' pois a URL já está correta.
     url = DATABASE_URL_REMOTE
 
-    engine = create_engine(url)
+    try:
+        engine = create_engine(url)
+    except Exception as e:
+        print(f"ERRO: Falha ao criar o motor de conexão. URL correta? {e}")
+        raise
 
-    # Garante que os modelos sejam reconhecidos pelo motor de conexão
-    with app.app_context():
-        # A reflexão é usada aqui para que os modelos do app.py sejam mapeados para a engine remota
-        original_db.metadata.reflect(engine,
-                                     only=['cliente', 'pesquisa', 'processo', 'capaprocessp', 'documentoinicial',
-                                           'andamento', 'parte', 'advogado'])
+    # Tentativa 2: Fazer o mapeamento dos modelos (que foi o erro anterior)
+    try:
+        with app.app_context():
+            # CORREÇÃO: Informa ao SQLAlchemy os nomes exatos das tabelas no PostgreSQL
+            original_db.metadata.reflect(engine, only=[
+                'cliente',
+                'pesquisa',
+                'processo',
+                'capaprocessp',  # Nome exato do erro
+                'documentoinicial',  # Nome exato do erro
+                'andamento',
+                'parte',
+                'advogado'
+            ])
+    except Exception as e:
+        print(f"ERRO: Falha no mapeamento (Reflect). O Deploy no Render foi concluído?")
+        print(
+            f"Verifique se os nomes das tabelas no app.py (__tablename__) correspondem exatamente a 'capaprocessp' e 'documentoinicial'")
+        print(f"Erro detalhado: {e}")
+        raise
 
     Session = sessionmaker(bind=engine)
     return Session()
@@ -58,7 +76,7 @@ def exportar_para_excel():
             print(
                 f"SUCESSO: Encontradas {len(pesquisas_pendentes_direto)} pesquisas com o status 'PENDENTE'. Exportando...")
 
-            # --- LÓGICA DE EXPORTAÇÃO (SE TUDO ESTIVER CORRETO) ---
+            # --- LÓGICA DE EXPORTAÇÃO ---
             dados_para_exportar = []
             for pesquisa in pesquisas_pendentes_direto:
                 for processo in pesquisa.processos:

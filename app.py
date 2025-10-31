@@ -57,8 +57,6 @@ class Processo(db.Model):
     pesquisa_id = db.Column(db.Integer, db.ForeignKey('pesquisa.id'), nullable=False)
     numero_processo = db.Column(db.String(100), nullable=False)
     dados_processo_encontrado = db.Column(db.Boolean, default=False)
-
-    # --- RELAÇÕES ATUALIZADAS ---
     capa = db.relationship('CapaProcesso', backref='processo', uselist=False, lazy=True)
     documentos = db.relationship('DocumentoInicial', backref='processo', lazy=True)
     andamentos = db.relationship('Andamento', backref='processo', lazy=True)
@@ -67,7 +65,8 @@ class Processo(db.Model):
 
 
 class CapaProcesso(db.Model):
-    __tablename__ = 'capa_processo'  # Corrigido: Agora usa snake_case minúsculo
+    # CORRIGIDO: Mapeia para o nome exato do erro ('capaprocessp')
+    __tablename__ = 'capaprocessp'
     id = db.Column(db.Integer, primary_key=True)
     processo_id = db.Column(db.Integer, db.ForeignKey('processo.id'), unique=True, nullable=False)
     valor_causa = db.Column(db.Float, nullable=True)
@@ -76,10 +75,11 @@ class CapaProcesso(db.Model):
 
 
 class DocumentoInicial(db.Model):
-    __tablename__ = 'documento_inicial'  # Corrigido: Agora usa snake_case minúsculo
+    # CORRIGIDO: Mapeia para o nome exato do erro ('documentoinicial')
+    __tablename__ = 'documentoinicial'
     id = db.Column(db.Integer, primary_key=True)
     processo_id = db.Column(db.Integer, db.ForeignKey('processo.id'), nullable=False)
-    link_documento = db.Column(db.String(500), nullable=True)  # Salva a URL completa
+    link_documento = db.Column(db.String(500), nullable=True)
     documento_encontrado = db.Column(db.Boolean, default=False)
     doc_peticao_inicial = db.Column(db.Boolean, default=False)
 
