@@ -174,6 +174,7 @@ def cadastra_pesquisa():
         return jsonify({"codPesquisa": nova_pesquisa.id}), 200
     except Exception as e:
         db.session.rollback()
+        print(f"ERRO EM /CadastraPesquisa: {e}")  # Adicionado log de erro detalhado
         return jsonify({"erro": "Erro interno ao processar"}), 500
 
 
@@ -341,18 +342,25 @@ def busca_andamentos():
         return jsonify({"erro": "Erro interno ao processar"}), 500
 
 
-# --- ROTA TEMPORÁRIA DE SETUP (CRIA TABELAS E CLIENTES) ---
+# --- ROTA TEMPORÁRIA DE SETUP (CRIA/APAGA TABELAS E CLIENTES) ---
 @app.route('/admin/setup-database/criaaiconsult2025')
 def setup_database():
     """
-    Endpoint de admin. CRIA AS TABELAS no PostgreSQL e POPULA clientes iniciais.
+    Endpoint de admin. APAGA TUDO, CRIA AS TABELAS no PostgreSQL e POPULA clientes iniciais.
     """
     try:
         with app.app_context():
-            # --- PASSO 1: CRIAR AS TABELAS (e colunas novas) ---
-            db.create_all()
+            # --- PASSO 1: APAGAR TUDO (PARA GARANTIR UMA RECRIAÇÃO LIMPA) ---
+            print("AVISO: Apagando todas as tabelas (db.drop_all())...")
+            db.drop_all()
+            print("Tabelas apagadas.")
 
-            # --- PASSO 2: POPULAR O CLIENTE 1 e 2 ---
+            # --- PASSO 2: CRIAR AS TABELAS (e colunas novas) ---
+            print("Criando tabelas (db.create_all())...")
+            db.create_all()
+            print("Tabelas criadas com sucesso (com os nomes corrigidos).")
+
+            # --- PASSO 3: POPULAR O CLIENTE 1 e 2 ---
             cliente1_existe = Cliente.query.filter_by(nome_relacional="CRIAAI").first()
             if not cliente1_existe:
                 cliente_teste = Cliente(nome_relacional="CRIAAI", token_api="senha")
@@ -364,10 +372,11 @@ def setup_database():
                 db.session.add(cliente_cry2)
 
             db.session.commit()
-            return jsonify({"status": "sucesso", "mensagem": "Tabelas criadas/atualizadas e banco populado."}), 200
+            return jsonify({"status": "sucesso", "mensagem": "Banco de dados recriado (Drop/Create) e populado."}), 200
 
     except Exception as e:
         db.session.rollback()
+        print(f"Erro no setup: {e}")
         return jsonify({"status": "erro", "mensagem": str(e)}), 500
 
 
