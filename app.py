@@ -69,6 +69,7 @@ class Processo(db.Model):
 
 
 class CapaProcesso(db.Model):
+    # CORRIGIDO: Mapeia para o nome exato do erro ('capaprocessp')
     __tablename__ = 'capaprocessp'
     id = db.Column(db.Integer, primary_key=True)
     processo_id = db.Column(db.Integer, db.ForeignKey('processo.id'), unique=True, nullable=False)
@@ -78,6 +79,7 @@ class CapaProcesso(db.Model):
 
 
 class DocumentoInicial(db.Model):
+    # CORRIGIDO: Mapeia para o nome exato do erro ('documentoinicial')
     __tablename__ = 'documentoinicial'
     id = db.Column(db.Integer, primary_key=True)
     processo_id = db.Column(db.Integer, db.ForeignKey('processo.id'), nullable=False)
@@ -250,7 +252,6 @@ def busca_docs_iniciais():
             return jsonify({"status": "processando",
                             "mensagem": "Os resultados desta pesquisa ainda estão sendo processados."}), 202
 
-        # Se o status for CONCLUIDO, muda para ENTREGUE e salva a data
         if pesquisa.status == 'CONCLUIDO':
             pesquisa.status = 'ENTREGUE'
             pesquisa.data_entrega = datetime.datetime.utcnow()
